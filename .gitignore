@@ -21,6 +21,7 @@ coverage/
 # Tool state
 .neon/
 .supabase/
+supabase/.temp/
 .DS_Store
 .idea/
 .vscode/

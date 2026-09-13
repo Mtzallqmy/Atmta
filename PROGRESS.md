@@ -6,8 +6,8 @@
 |---|---|---|
 | Stage 0 — Repository Audit | مكتملة | مستودع جديد وفارغ، الفرع الافتراضي `main`، لا ملفات أو أسرار موجودة |
 | Stage 1 — Foundation | مكتملة | البنية، الحماية، CI، workspace وLocal Agent scaffold |
-| Stage 2 — Supabase Schema | قيد التنفيذ | — |
-| Stage 3 — Telegram Core | لم تبدأ | — |
+| Stage 2 — Supabase Schema | مكتملة | 14 جدولًا، RLS، grants صريحة، atomic claims وAgent RPCs محدودة |
+| Stage 3 — Telegram Core | قيد التنفيذ | — |
 | Stage 4 — Meta Foundation | لم تبدأ | — |
 | Stage 5 — Publish Now | لم تبدأ | — |
 | Stage 6 — Scheduling | لم تبدأ | — |
