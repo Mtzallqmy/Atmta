@@ -1,0 +1,15 @@
+{
+  "name": "atmta-facebook-automation",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "build": "pnpm --filter @atmta/local-agent build",
+    "typecheck": "pnpm --filter @atmta/local-agent typecheck",
+    "test": "pnpm --filter @atmta/local-agent test",
+    "validate:workflows": "node scripts/validate-workflows.mjs",
+    "check:env": "node scripts/check-env.mjs",
+    "scan:secrets": "node scripts/secret-scan.mjs",
+    "validate": "pnpm typecheck && pnpm test && pnpm validate:workflows && pnpm check:env && pnpm scan:secrets"
+  }
+}

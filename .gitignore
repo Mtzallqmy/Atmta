@@ -1,0 +1,26 @@
+# Environment and credentials
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.log
+
+# Local browser/session state — never commit
+.local-data/
+.local-state/
+**/.local-data/
+**/.local-state/
+**/facebook-profile/
+**/cookies*.json
+
+# Tool state
+.neon/
+.supabase/
+.DS_Store
+.idea/
+.vscode/
