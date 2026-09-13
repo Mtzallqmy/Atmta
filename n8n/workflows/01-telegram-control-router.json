@@ -1,0 +1,114 @@
+{
+  "name": "Atmta 01 - Telegram Control Router",
+  "nodes": [
+    {
+      "parameters": { "updates": ["message", "callback_query"], "additionalFields": { "download": true } },
+      "id": "telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [-900, 0],
+      "credentials": { "telegramApi": { "id": "REPLACE_TELEGRAM_CREDENTIAL_ID", "name": "Atmta Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const u = $json;\nconst cb = u.callback_query;\nconst msg = cb?.message ?? u.message;\nif (!msg?.chat?.id || !(cb?.from?.id ?? msg?.from?.id)) throw new Error('Unsupported Telegram update');\nconst raw = cb?.data ?? msg?.text ?? '';\nconst command = raw.startsWith('/') ? raw.slice(1).split(/\\s+/)[0].toLowerCase() : null;\nreturn [{ json: { updateType: cb ? 'callback' : 'message', callbackQueryId: cb?.id ?? null, callbackData: cb?.data ?? null, command, text: msg?.text ?? msg?.caption ?? '', telegramUserId: String(cb?.from?.id ?? msg.from.id), chatId: String(msg.chat.id), messageId: msg.message_id, media: msg.photo?.at(-1) ?? msg.video ?? null } }];"
+      },
+      "id": "normalize",
+      "name": "Normalize Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-680, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ $vars.SUPABASE_URL + '/rest/v1/telegram_admins?select=telegram_user_id,chat_id,enabled&telegram_user_id=eq.' + $json.telegramUserId + '&chat_id=eq.' + $json.chatId + '&enabled=eq.true&limit=1' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "check-admin",
+      "name": "Authorization Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-460, 0],
+      "alwaysOutputData": true,
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": { "conditions": { "options": { "caseSensitive": true, "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.enabled }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true", "singleValue": true } }], "combinator": "and" } },
+      "id": "authorized-if",
+      "name": "Authorized?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-240, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ $vars.SUPABASE_URL + '/rest/v1/telegram_sessions?select=state,payload,expires_at&telegram_user_id=eq.' + $('Normalize Update').item.json.telegramUserId + '&chat_id=eq.' + $('Normalize Update').item.json.chatId + '&expires_at=gt.' + $now.toISO() + '&limit=1' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "load-session",
+      "name": "Load Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [0, -120],
+      "alwaysOutputData": true,
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const n = $('Normalize Update').item.json;\nconst route = n.callbackData?.split(':')[0] ?? n.command ?? 'session';\nconst menu = 'اختر من القائمة:\\n\\n📢 /publish — نشر\\n🗓 /schedule — جدولة\\n📝 /posts — المنشورات\\n💬 /comments — التعليقات\\n🤖 /automation — الأتمتة\\n👥 /friends — طلبات الصداقة\\n📊 /status — الحالة\\n⚙️ /settings — الإعدادات';\nconst replies = { start: `مرحبًا بك في Atmta.\\n\\n${menu}`, help: menu, status: '🟢 النظام متصل. جارٍ تحميل الحالة التفصيلية من Supabase.', publish: '📢 لنبدأ النشر. اختر الصفحة من القائمة التالية.', schedule: '🗓 أرسل أو اختر منشورًا لحجز موعد نشر.', posts: '📝 جارٍ تحميل أحدث المنشورات.', comments: '💬 جارٍ تحميل التعليقات التي تحتاج مراجعة.', automation: '🤖 جارٍ تحميل قواعد الأتمتة.', friends: '👥 جارٍ تحميل حالة Local Agent.', pause: '⏸ يتطلب الإيقاف تأكيدًا من زر المتابعة.', resume: '▶️ يتطلب التشغيل تأكيدًا من زر المتابعة.', settings: '⚙️ اختر الإعداد الذي تريد تغييره.' };\nreturn [{ json: { ...n, route, response: replies[route] ?? 'أرسل /help لعرض الأوامر المتاحة.', session: $json.state ? $json : null } }];"
+      },
+      "id": "route-command",
+      "name": "Route Command or Callback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, -120]
+    },
+    {
+      "parameters": { "jsCode": "const n = $('Normalize Update').item.json;\nreturn [{ json: { ...n, response: 'عذرًا، لا يمكنك استخدام هذا البوت.', securityEvent: true } }];" },
+      "id": "deny",
+      "name": "Deny Unauthorized",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 140]
+    },
+    {
+      "parameters": { "resource": "callback", "operation": "answerQuery", "queryId": "={{ $json.callbackQueryId }}", "additionalFields": {} },
+      "id": "ack-callback",
+      "name": "Answer Callback Query",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [500, 0],
+      "continueOnFail": true,
+      "credentials": { "telegramApi": { "id": "REPLACE_TELEGRAM_CREDENTIAL_ID", "name": "Atmta Telegram Bot" } }
+    },
+    {
+      "parameters": { "chatId": "={{ $('Normalize Update').item.json.chatId }}", "text": "={{ $('Route Command or Callback').isExecuted ? $('Route Command or Callback').item.json.response : $('Deny Unauthorized').item.json.response }}", "additionalFields": { "appendAttribution": false } },
+      "id": "send-response",
+      "name": "Send Telegram Response",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [740, 0],
+      "credentials": { "telegramApi": { "id": "REPLACE_TELEGRAM_CREDENTIAL_ID", "name": "Atmta Telegram Bot" } }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": { "main": [[{ "node": "Normalize Update", "type": "main", "index": 0 }]] },
+    "Normalize Update": { "main": [[{ "node": "Authorization Check", "type": "main", "index": 0 }]] },
+    "Authorization Check": { "main": [[{ "node": "Authorized?", "type": "main", "index": 0 }]] },
+    "Authorized?": { "main": [[{ "node": "Load Session", "type": "main", "index": 0 }], [{ "node": "Deny Unauthorized", "type": "main", "index": 0 }]] },
+    "Load Session": { "main": [[{ "node": "Route Command or Callback", "type": "main", "index": 0 }]] },
+    "Route Command or Callback": { "main": [[{ "node": "Answer Callback Query", "type": "main", "index": 0 }]] },
+    "Deny Unauthorized": { "main": [[{ "node": "Answer Callback Query", "type": "main", "index": 0 }]] },
+    "Answer Callback Query": { "main": [[{ "node": "Send Telegram Response", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1", "saveManualExecutions": true, "callerPolicy": "workflowsFromSameOwner" },
+  "versionId": "11111111-1111-4111-8111-111111111111",
+  "active": false,
+  "tags": []
+}
