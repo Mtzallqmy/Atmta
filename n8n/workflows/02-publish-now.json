@@ -1,0 +1,185 @@
+{
+  "name": "Atmta 02 - Publish Now",
+  "nodes": [
+    {
+      "parameters": { "workflowInputs": { "values": [{ "name": "post_id" }, { "name": "already_claimed", "type": "boolean" }] } },
+      "id": "input",
+      "name": "Post Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [-920, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ $vars.SUPABASE_URL + '/rest/v1/posts?select=*,facebook_pages!inner(page_id,name)&id=eq.' + $json.post_id + '&limit=1' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "load-post",
+      "name": "Load Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-700, 0],
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const post = $json;\nif (!post.id) throw new Error('Post not found');\nconst claimed = Boolean($('Post Input').item.json.already_claimed);\nif (['published','cancelled','failed'].includes(post.status)) throw new Error(`Post cannot be published from ${post.status}`);\nif (post.status === 'processing' && !claimed) throw new Error('Post already processing');\nif (claimed && post.status !== 'processing') throw new Error('Expected an atomically claimed post');\nconst page = post.facebook_pages?.page_id;\nif (!page) throw new Error('Facebook page is missing');\nconst media = post.media_urls?.[0];\nif (post.type !== 'text' && !media) throw new Error('Media URL is required');\nconst endpoints = { text: 'feed', image: 'photos', video: 'videos' };\nlet body = '';\nif (post.type === 'text') body = new URLSearchParams({ message: post.text_content ?? '' }).toString();\nif (post.type === 'image') body = new URLSearchParams({ url: media, caption: post.text_content ?? '' }).toString();\nif (post.type === 'video') body = new URLSearchParams({ file_url: media, description: post.text_content ?? '' }).toString();\nreturn [{ json: { ...post, graphPageId: page, isReel: post.type === 'reel', endpoint: endpoints[post.type] ?? 'video_reels', body, mediaUrl: media ?? null } }];"
+      },
+      "id": "validate",
+      "name": "Validate and Prepare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-480, 0]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $vars.SUPABASE_URL + '/rest/v1/posts?id=eq.' + $json.id + ($('Post Input').item.json.already_claimed ? '&status=eq.processing' : '&status=in.(draft,awaiting_approval)') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Prefer", "value": "return=representation" }] },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ status: 'processing', processing_started_at: $now.toISO(), error_message: null }) }}",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "claim",
+      "name": "Claim Immediate Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-260, 0],
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": { "conditions": { "conditions": [{ "leftValue": "={{ $('Validate and Prepare').item.json.isReel }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true", "singleValue": true } }], "combinator": "and" } },
+      "id": "is-reel",
+      "name": "Is Reel?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-40, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/' + $vars.META_GRAPH_API_VERSION + '/' + $('Validate and Prepare').item.json.graphPageId + '/' + $('Validate and Prepare').item.json.endpoint }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/x-www-form-urlencoded",
+        "body": "={{ $('Validate and Prepare').item.json.body }}",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "publish-standard",
+      "name": "Publish Text Photo or Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [200, 120],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": { "httpHeaderAuth": { "id": "REPLACE_META_PAGE_TOKEN_CREDENTIAL_ID", "name": "Meta Page Token" } }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/' + $vars.META_GRAPH_API_VERSION + '/' + $('Validate and Prepare').item.json.graphPageId + '/video_reels' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": { "parameters": [{ "name": "upload_phase", "value": "start" }] },
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "reel-start",
+      "name": "Start Reel Upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [200, -140],
+      "credentials": { "httpHeaderAuth": { "id": "REPLACE_META_PAGE_TOKEN_CREDENTIAL_ID", "name": "Meta Page Token" } }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.upload_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "file_url", "value": "={{ $('Validate and Prepare').item.json.mediaUrl }}" }] },
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "reel-upload",
+      "name": "Upload Reel from Signed URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, -140],
+      "credentials": { "httpHeaderAuth": { "id": "REPLACE_META_PAGE_TOKEN_CREDENTIAL_ID", "name": "Meta Page Token" } }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/' + $vars.META_GRAPH_API_VERSION + '/' + $('Validate and Prepare').item.json.graphPageId + '/video_reels' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": { "parameters": [{ "name": "upload_phase", "value": "finish" }, { "name": "video_id", "value": "={{ $('Start Reel Upload').item.json.video_id }}" }, { "name": "video_state", "value": "PUBLISHED" }, { "name": "description", "value": "={{ $('Validate and Prepare').item.json.text_content ?? '' }}" }] },
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "reel-finish",
+      "name": "Finish Reel Publish",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, -140],
+      "credentials": { "httpHeaderAuth": { "id": "REPLACE_META_PAGE_TOKEN_CREDENTIAL_ID", "name": "Meta Page Token" } }
+    },
+    {
+      "parameters": { "jsCode": "const post = $('Validate and Prepare').item.json;\nconst id = post.isReel ? $('Start Reel Upload').item.json.video_id : ($json.id ?? $json.post_id);\nif (!id) throw new Error('Meta did not return a publication id');\nreturn [{ json: { postId: post.id, facebookPostId: String(id), pageName: post.facebook_pages.name } }];" },
+      "id": "normalize-result",
+      "name": "Normalize Publish Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 20]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $vars.SUPABASE_URL + '/rest/v1/posts?id=eq.' + $json.postId + '&status=eq.processing' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Prefer", "value": "return=representation" }] },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ status: 'published', facebook_post_id: $json.facebookPostId, published_at: $now.toISO(), error_message: null }) }}",
+        "options": {}
+      },
+      "id": "save-success",
+      "name": "Mark Published",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1160, 20],
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    }
+  ],
+  "connections": {
+    "Post Input": { "main": [[{ "node": "Load Post", "type": "main", "index": 0 }]] },
+    "Load Post": { "main": [[{ "node": "Validate and Prepare", "type": "main", "index": 0 }]] },
+    "Validate and Prepare": { "main": [[{ "node": "Claim Immediate Post", "type": "main", "index": 0 }]] },
+    "Claim Immediate Post": { "main": [[{ "node": "Is Reel?", "type": "main", "index": 0 }]] },
+    "Is Reel?": { "main": [[{ "node": "Start Reel Upload", "type": "main", "index": 0 }], [{ "node": "Publish Text Photo or Video", "type": "main", "index": 0 }]] },
+    "Start Reel Upload": { "main": [[{ "node": "Upload Reel from Signed URL", "type": "main", "index": 0 }]] },
+    "Upload Reel from Signed URL": { "main": [[{ "node": "Finish Reel Publish", "type": "main", "index": 0 }]] },
+    "Finish Reel Publish": { "main": [[{ "node": "Normalize Publish Result", "type": "main", "index": 0 }]] },
+    "Publish Text Photo or Video": { "main": [[{ "node": "Normalize Publish Result", "type": "main", "index": 0 }]] },
+    "Normalize Publish Result": { "main": [[{ "node": "Mark Published", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1", "saveManualExecutions": true, "callerPolicy": "workflowsFromSameOwner" },
+  "versionId": "22222222-2222-4222-8222-222222222222",
+  "active": false,
+  "tags": []
+}

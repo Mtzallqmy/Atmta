@@ -9,8 +9,8 @@
 | Stage 2 — Supabase Schema | مكتملة | 14 جدولًا، RLS، grants صريحة، atomic claims وAgent RPCs محدودة |
 | Stage 3 — Telegram Core | مكتملة | Router، allowlist مزدوجة، callback acknowledgement وsession loading |
 | Stage 4 — Meta Foundation | مكتملة | مزامنة صفحات، credential strategy، permissions وwebhook setup موثقة |
-| Stage 5 — Publish Now | قيد التنفيذ | — |
-| Stage 6 — Scheduling | لم تبدأ | — |
+| Stage 5 — Publish Now | مكتملة | text/photo/video وReels phased upload مع idempotent status gate |
+| Stage 6 — Scheduling | قيد التنفيذ | — |
 | Stage 7 — Meta Comments | لم تبدأ | — |
 | Stage 8 — Comment Automation | لم تبدأ | — |
 | Stage 9 — Local Agent | لم تبدأ | — |
