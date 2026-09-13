@@ -1,0 +1,138 @@
+{
+  "name": "Atmta 05 - Comment Automation",
+  "nodes": [
+    {
+      "parameters": { "workflowInputs": { "values": [{ "name": "comment_id" }] } },
+      "id": "input",
+      "name": "Comment Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [-800, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_URL + '/rest/v1/rpc/claim_comment_action' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ p_comment_id: $json.comment_id }) }}",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "claim-action",
+      "name": "Atomically Select Rule",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-560, 0],
+      "alwaysOutputData": true,
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": {
+        "url": "={{ $vars.SUPABASE_URL + '/rest/v1/comments?select=*,facebook_pages!inner(page_id,name)&id=eq.' + $json.comment_id + '&limit=1' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "load-comment",
+      "name": "Load Comment Context",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-320, 0],
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": { "conditions": { "conditions": [{ "leftValue": "={{ $('Atomically Select Rule').item.json.action }}", "rightValue": "reply", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } },
+      "id": "auto-reply",
+      "name": "Automatic Reply?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-80, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/' + $vars.META_GRAPH_API_VERSION + '/' + $json.facebook_comment_id + '/comments' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/x-www-form-urlencoded",
+        "body": "={{ new URLSearchParams({ message: $('Atomically Select Rule').item.json.response_text }).toString() }}",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "reply-meta",
+      "name": "Reply via Meta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [180, -120],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": { "httpHeaderAuth": { "id": "REPLACE_META_PAGE_TOKEN_CREDENTIAL_ID", "name": "Meta Page Token" } }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $vars.SUPABASE_URL + '/rest/v1/comment_actions?id=eq.' + $('Atomically Select Rule').item.json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ status: 'done', executed_at: $now.toISO() }) }}",
+        "options": {}
+      },
+      "id": "complete-action",
+      "name": "Complete Reply Action",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, -120],
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": {
+        "url": "={{ $vars.SUPABASE_URL + '/rest/v1/telegram_admins?select=chat_id&enabled=eq.true&limit=1' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "load-admin",
+      "name": "Load Review Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [180, 120],
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ '💬 تعليق جديد\\n\\nالصفحة: ' + $('Load Comment Context').item.json.facebook_pages.name + '\\nالمستخدم: ' + ($('Load Comment Context').item.json.facebook_user_name ?? 'غير معروف') + '\\nالتعليق:\\n' + $('Load Comment Context').item.json.message }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": { "rows": [{ "row": { "buttons": [{ "text": "🤖 اقتراح رد", "additionalFields": { "callback_data": "={{ 'comment:ai:' + $('Load Comment Context').item.json.id }}" } }, { "text": "✍️ رد يدوي", "additionalFields": { "callback_data": "={{ 'comment:manual:' + $('Load Comment Context').item.json.id }}" } }] } }, { "row": { "buttons": [{ "text": "🙈 إخفاء", "additionalFields": { "callback_data": "={{ 'comment:hide:' + $('Load Comment Context').item.json.id }}" } }, { "text": "⏭ تجاهل", "additionalFields": { "callback_data": "={{ 'comment:ignore:' + $('Load Comment Context').item.json.id }}" } }] } } ] },
+        "additionalFields": { "appendAttribution": false }
+      },
+      "id": "send-review",
+      "name": "Send Telegram Review",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [420, 120],
+      "credentials": { "telegramApi": { "id": "REPLACE_TELEGRAM_CREDENTIAL_ID", "name": "Atmta Telegram Bot" } }
+    }
+  ],
+  "connections": {
+    "Comment Input": { "main": [[{ "node": "Atomically Select Rule", "type": "main", "index": 0 }]] },
+    "Atomically Select Rule": { "main": [[{ "node": "Load Comment Context", "type": "main", "index": 0 }]] },
+    "Load Comment Context": { "main": [[{ "node": "Automatic Reply?", "type": "main", "index": 0 }]] },
+    "Automatic Reply?": { "main": [[{ "node": "Reply via Meta", "type": "main", "index": 0 }], [{ "node": "Load Review Chat", "type": "main", "index": 0 }]] },
+    "Reply via Meta": { "main": [[{ "node": "Complete Reply Action", "type": "main", "index": 0 }]] },
+    "Load Review Chat": { "main": [[{ "node": "Send Telegram Review", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1", "saveManualExecutions": true, "callerPolicy": "workflowsFromSameOwner" },
+  "versionId": "55555555-5555-4555-8555-555555555555",
+  "active": false,
+  "tags": []
+}

@@ -60,6 +60,19 @@
       "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
     },
     {
+      "parameters": {
+        "source": "database",
+        "workflowId": { "__rl": true, "value": "={{ $vars.COMMENT_AUTOMATION_WORKFLOW_ID }}", "mode": "id" },
+        "workflowInputs": { "mappingMode": "defineBelow", "value": { "comment_id": "={{ $json.id }}" }, "matchingColumns": [], "schema": [] },
+        "options": { "waitForSubWorkflow": false }
+      },
+      "id": "run-comment-automation",
+      "name": "Run Comment Automation",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [320, 140]
+    },
+    {
       "parameters": { "jsCode": "const event = $('Verify Signature and Normalize').item.json;\nif (!$json.id) throw new Error('Unknown or disabled Facebook page');\nreturn [{ json: { page_id: $json.id, facebook_comment_id: event.facebook_comment_id, facebook_post_id: event.facebook_post_id, facebook_user_id: event.facebook_user_id, facebook_user_name: event.facebook_user_name, message: event.message, parent_comment_id: event.parent_comment_id, created_time: event.created_time, metadata: event.metadata } }];" },
       "id": "comment-record",
       "name": "Build Comment Record",
@@ -95,7 +108,8 @@
     "Meta Events POST": { "main": [[{ "node": "Verify Signature and Normalize", "type": "main", "index": 0 }]] },
     "Verify Signature and Normalize": { "main": [[{ "node": "Resolve Page", "type": "main", "index": 0 }]] },
     "Resolve Page": { "main": [[{ "node": "Build Comment Record", "type": "main", "index": 0 }]] },
-    "Build Comment Record": { "main": [[{ "node": "Deduplicate and Store Comment", "type": "main", "index": 0 }]] }
+    "Build Comment Record": { "main": [[{ "node": "Deduplicate and Store Comment", "type": "main", "index": 0 }]] },
+    "Deduplicate and Store Comment": { "main": [[{ "node": "Run Comment Automation", "type": "main", "index": 0 }]] }
   },
   "pinData": {},
   "settings": { "executionOrder": "v1", "saveManualExecutions": true },

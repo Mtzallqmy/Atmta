@@ -29,6 +29,23 @@ begin
 end;
 $$;
 
+insert into public.comment_rules (name, match_type, keywords, response_mode, response_template)
+values ('availability', 'contains', '["متوفر"]'::jsonb, 'rule_auto', 'نعم، متوفر.');
+insert into public.comments (page_id, facebook_comment_id, facebook_post_id, facebook_user_id, message)
+select id, 'test-comment', 'test-post', 'test-user', 'هل المنتج متوفر؟' from public.facebook_pages where page_id = 'test-page';
+
+do $$
+declare comment_uuid uuid; first_count integer; second_count integer;
+begin
+  select id into comment_uuid from public.comments where facebook_comment_id = 'test-comment';
+  select count(*) into first_count from public.claim_comment_action(comment_uuid);
+  select count(*) into second_count from public.claim_comment_action(comment_uuid);
+  if first_count <> 1 or second_count <> 0 then
+    raise exception 'comment action claim is not idempotent: first %, second %', first_count, second_count;
+  end if;
+end;
+$$;
+
 insert into public.posts (page_id, type, text_content, status, scheduled_at, created_by_telegram_user_id)
 select id, 'text', 'future', 'scheduled', now() + interval '1 hour', 1 from public.facebook_pages where page_id = 'test-page';
 

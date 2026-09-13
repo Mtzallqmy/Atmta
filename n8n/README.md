@@ -9,6 +9,7 @@ Workflow exports are stored in `workflows/`. Exports never contain credential va
 3. `02-publish-now.json`
 4. `03-scheduled-publisher.json`
 5. `04-meta-comments-webhook.json`
+6. `05-comment-automation.json`
 
 Keep workflows inactive until credentials and n8n Variables are configured.
 
@@ -19,6 +20,6 @@ Keep workflows inactive until credentials and n8n Variables are configured.
 - `Meta User Token` (`httpHeaderAuth`; `Authorization: Bearer …`)
 - `Meta Page Token` (`httpHeaderAuth`; configure `Authorization: OAuth …` for publishing and Reels upload)
 
-Replace placeholder credential IDs after import. Create n8n Variables `SUPABASE_URL`, `META_GRAPH_API_VERSION`, `PUBLISH_WORKFLOW_ID`, `META_WEBHOOK_VERIFY_TOKEN`, and `META_APP_SECRET`. For production, source the two Meta secrets from n8n External Secrets/runtime secret configuration when available rather than ordinary shared Variables.
+Replace placeholder credential IDs after import. Create n8n Variables `SUPABASE_URL`, `META_GRAPH_API_VERSION`, `PUBLISH_WORKFLOW_ID`, `COMMENT_AUTOMATION_WORKFLOW_ID`, `META_WEBHOOK_VERIFY_TOKEN`, and `META_APP_SECRET`. For production, source the two Meta secrets from n8n External Secrets/runtime secret configuration when available rather than ordinary shared Variables.
 
 `04` requires raw webhook bodies. Do not activate it until a test with `meta-comment-event.json` plus a correctly calculated signature passes; unsigned or reconstructed JSON bodies are deliberately rejected.
