@@ -10,8 +10,8 @@
 | Stage 3 — Telegram Core | مكتملة | Router، allowlist مزدوجة، callback acknowledgement وsession loading |
 | Stage 4 — Meta Foundation | مكتملة | مزامنة صفحات، credential strategy، permissions وwebhook setup موثقة |
 | Stage 5 — Publish Now | مكتملة | text/photo/video وReels phased upload مع idempotent status gate |
-| Stage 6 — Scheduling | قيد التنفيذ | — |
-| Stage 7 — Meta Comments | لم تبدأ | — |
+| Stage 6 — Scheduling | مكتملة | Schedule Trigger، atomic SKIP LOCKED claim، cancel/reschedule RPCs |
+| Stage 7 — Meta Comments | قيد التنفيذ | — |
 | Stage 8 — Comment Automation | لم تبدأ | — |
 | Stage 9 — Local Agent | لم تبدأ | — |
 | Stage 10 — Friend Requests | لم تبدأ | — |

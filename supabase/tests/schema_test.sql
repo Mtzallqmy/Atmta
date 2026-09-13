@@ -28,3 +28,17 @@ begin
   end if;
 end;
 $$;
+
+insert into public.posts (page_id, type, text_content, status, scheduled_at, created_by_telegram_user_id)
+select id, 'text', 'future', 'scheduled', now() + interval '1 hour', 1 from public.facebook_pages where page_id = 'test-page';
+
+do $$
+declare future_id uuid; changed boolean;
+begin
+  select id into future_id from public.posts where text_content = 'future';
+  select public.reschedule_post(future_id, now() + interval '2 hours') into changed;
+  if not changed then raise exception 'reschedule failed'; end if;
+  select public.cancel_scheduled_post(future_id) into changed;
+  if not changed then raise exception 'cancel failed'; end if;
+end;
+$$;

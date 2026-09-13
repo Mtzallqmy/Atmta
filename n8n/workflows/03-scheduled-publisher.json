@@ -1,0 +1,64 @@
+{
+  "name": "Atmta 03 - Scheduled Publisher",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "minutes", "minutesInterval": 1 }] } },
+      "id": "schedule",
+      "name": "Every Minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-560, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_URL + '/rest/v1/rpc/claim_due_posts' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "{\"p_limit\":20}",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "claim-due",
+      "name": "Atomically Claim Due Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-320, 0],
+      "alwaysOutputData": true,
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": { "jsCode": "if (!$json.id) return [];\nreturn [{ json: { post_id: $json.id, already_claimed: true } }];" },
+      "id": "prepare",
+      "name": "Prepare Claimed Post",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-80, 0]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": { "__rl": true, "value": "={{ $vars.PUBLISH_WORKFLOW_ID }}", "mode": "id" },
+        "workflowInputs": { "mappingMode": "defineBelow", "value": { "post_id": "={{ $json.post_id }}", "already_claimed": true }, "matchingColumns": [], "schema": [] },
+        "options": { "waitForSubWorkflow": true }
+      },
+      "id": "publish",
+      "name": "Execute Publish Workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [160, 0]
+    }
+  ],
+  "connections": {
+    "Every Minute": { "main": [[{ "node": "Atomically Claim Due Posts", "type": "main", "index": 0 }]] },
+    "Atomically Claim Due Posts": { "main": [[{ "node": "Prepare Claimed Post", "type": "main", "index": 0 }]] },
+    "Prepare Claimed Post": { "main": [[{ "node": "Execute Publish Workflow", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1", "timezone": "Asia/Aden", "saveManualExecutions": true },
+  "versionId": "33333333-3333-4333-8333-333333333333",
+  "active": false,
+  "tags": []
+}
