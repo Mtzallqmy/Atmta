@@ -1,0 +1,68 @@
+{
+  "name": "Atmta 00 - Meta Page Sync",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-600, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://graph.facebook.com/' + $vars.META_GRAPH_API_VERSION + '/me/accounts' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": { "parameters": [{ "name": "fields", "value": "id,name,username,picture{url}" }] },
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "list-pages",
+      "name": "List Managed Pages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-360, 0],
+      "credentials": { "httpHeaderAuth": { "id": "REPLACE_META_USER_TOKEN_CREDENTIAL_ID", "name": "Meta User Token" } }
+    },
+    {
+      "parameters": { "jsCode": "const pages = $json.data ?? [];\nreturn pages.map((p) => ({ json: { page_id: String(p.id), name: p.name, username: p.username ?? null, picture_url: p.picture?.data?.url ?? null, enabled: true, metadata: { synced_at: new Date().toISOString() } } }));" },
+      "id": "normalize-pages",
+      "name": "Normalize Pages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-120, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_URL + '/rest/v1/facebook_pages?on_conflict=page_id' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Prefer", "value": "resolution=merge-duplicates,return=representation" }] },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "upsert-page",
+      "name": "Upsert Facebook Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [140, 0],
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": { "main": [[{ "node": "List Managed Pages", "type": "main", "index": 0 }]] },
+    "List Managed Pages": { "main": [[{ "node": "Normalize Pages", "type": "main", "index": 0 }]] },
+    "Normalize Pages": { "main": [[{ "node": "Upsert Facebook Page", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1", "saveManualExecutions": true },
+  "versionId": "00000000-0000-4000-8000-000000000000",
+  "active": false,
+  "tags": []
+}

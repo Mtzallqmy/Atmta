@@ -1,0 +1,11 @@
+{
+  "data": [
+    {
+      "id": "100000000000001",
+      "name": "Test Page",
+      "username": "test.page",
+      "picture": { "data": { "url": "https://example.invalid/page.jpg" } }
+    }
+  ],
+  "paging": {}
+}

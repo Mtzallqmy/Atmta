@@ -4,7 +4,8 @@ Workflow exports are stored in `workflows/`. Exports never contain credential va
 
 ## Import order
 
-1. `01-telegram-control-router.json`
+1. `00-meta-page-sync.json` (manual connectivity and page sync)
+2. `01-telegram-control-router.json`
 
 Keep workflows inactive until credentials and n8n Variables are configured.
 
@@ -12,5 +13,6 @@ Keep workflows inactive until credentials and n8n Variables are configured.
 
 - `Atmta Telegram Bot` (`telegramApi`)
 - `Atmta Supabase` (`supabaseApi`, service-role key; trusted n8n only)
+- `Meta User Token` (`httpHeaderAuth`; `Authorization: Bearer …`)
 
-Replace placeholder credential IDs after import. Create the n8n Variable `SUPABASE_URL` with the project URL.
+Replace placeholder credential IDs after import. Create n8n Variables `SUPABASE_URL` and `META_GRAPH_API_VERSION`.
