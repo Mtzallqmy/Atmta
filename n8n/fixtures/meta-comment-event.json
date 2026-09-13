@@ -1,0 +1,19 @@
+{
+  "object": "page",
+  "entry": [{
+    "id": "100000000000001",
+    "time": 1789344000,
+    "changes": [{
+      "field": "feed",
+      "value": {
+        "item": "comment",
+        "verb": "add",
+        "comment_id": "100000000000001_200000000000001",
+        "post_id": "100000000000001_300000000000001",
+        "message": "هل المنتج متوفر؟",
+        "from": { "id": "400000000000001", "name": "Test User" },
+        "created_time": 1789344000
+      }
+    }]
+  }]
+}
