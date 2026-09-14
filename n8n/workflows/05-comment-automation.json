@@ -94,6 +94,25 @@
     },
     {
       "parameters": {
+        "method": "PATCH",
+        "url": "={{ $vars.SUPABASE_URL + '/rest/v1/comments?id=eq.' + $('Load Comment Context').item.json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "{\"replied\":true}",
+        "options": {}
+      },
+      "id": "mark-comment-replied",
+      "name": "Mark Comment Replied",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, -120],
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": {
         "url": "={{ $vars.SUPABASE_URL + '/rest/v1/telegram_admins?select=chat_id&enabled=eq.true&limit=1' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
@@ -128,6 +147,7 @@
     "Load Comment Context": { "main": [[{ "node": "Automatic Reply?", "type": "main", "index": 0 }]] },
     "Automatic Reply?": { "main": [[{ "node": "Reply via Meta", "type": "main", "index": 0 }], [{ "node": "Load Review Chat", "type": "main", "index": 0 }]] },
     "Reply via Meta": { "main": [[{ "node": "Complete Reply Action", "type": "main", "index": 0 }]] },
+    "Complete Reply Action": { "main": [[{ "node": "Mark Comment Replied", "type": "main", "index": 0 }]] },
     "Load Review Chat": { "main": [[{ "node": "Send Telegram Review", "type": "main", "index": 0 }]] }
   },
   "pinData": {},

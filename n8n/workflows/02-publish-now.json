@@ -25,6 +25,29 @@
     },
     {
       "parameters": {
+        "url": "={{ $vars.SUPABASE_URL + '/rest/v1/telegram_admins?select=chat_id&enabled=eq.true&limit=1' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "load-admin",
+      "name": "Load Notification Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1380, 20],
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": { "chatId": "={{ $json.chat_id }}", "text": "={{ $('Normalize Publish Result').item.json.notification }}", "additionalFields": { "appendAttribution": false } },
+      "id": "notify-publish",
+      "name": "Notify Publish Result",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1600, 20],
+      "credentials": { "telegramApi": { "id": "REPLACE_TELEGRAM_CREDENTIAL_ID", "name": "Atmta Telegram Bot" } }
+    },
+    {
+      "parameters": {
         "jsCode": "const post = $json;\nif (!post.id) throw new Error('Post not found');\nconst claimed = Boolean($('Post Input').item.json.already_claimed);\nif (['published','cancelled','failed'].includes(post.status)) throw new Error(`Post cannot be published from ${post.status}`);\nif (post.status === 'processing' && !claimed) throw new Error('Post already processing');\nif (claimed && post.status !== 'processing') throw new Error('Expected an atomically claimed post');\nconst page = post.facebook_pages?.page_id;\nif (!page) throw new Error('Facebook page is missing');\nconst media = post.media_urls?.[0];\nif (post.type !== 'text' && !media) throw new Error('Media URL is required');\nconst endpoints = { text: 'feed', image: 'photos', video: 'videos' };\nlet body = '';\nif (post.type === 'text') body = new URLSearchParams({ message: post.text_content ?? '' }).toString();\nif (post.type === 'image') body = new URLSearchParams({ url: media, caption: post.text_content ?? '' }).toString();\nif (post.type === 'video') body = new URLSearchParams({ file_url: media, description: post.text_content ?? '' }).toString();\nreturn [{ json: { ...post, graphPageId: page, isReel: post.type === 'reel', endpoint: endpoints[post.type] ?? 'video_reels', body, mediaUrl: media ?? null } }];"
       },
       "id": "validate",
@@ -82,6 +105,7 @@
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput",
       "credentials": { "httpHeaderAuth": { "id": "REPLACE_META_PAGE_TOKEN_CREDENTIAL_ID", "name": "Meta Page Token" } }
     },
     {
@@ -99,6 +123,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [200, -140],
+      "onError": "continueRegularOutput",
       "credentials": { "httpHeaderAuth": { "id": "REPLACE_META_PAGE_TOKEN_CREDENTIAL_ID", "name": "Meta Page Token" } }
     },
     {
@@ -116,6 +141,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [440, -140],
+      "onError": "continueRegularOutput",
       "credentials": { "httpHeaderAuth": { "id": "REPLACE_META_PAGE_TOKEN_CREDENTIAL_ID", "name": "Meta Page Token" } }
     },
     {
@@ -133,10 +159,11 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [680, -140],
+      "onError": "continueRegularOutput",
       "credentials": { "httpHeaderAuth": { "id": "REPLACE_META_PAGE_TOKEN_CREDENTIAL_ID", "name": "Meta Page Token" } }
     },
     {
-      "parameters": { "jsCode": "const post = $('Validate and Prepare').item.json;\nconst id = post.isReel ? $('Start Reel Upload').item.json.video_id : ($json.id ?? $json.post_id);\nif (!id) throw new Error('Meta did not return a publication id');\nreturn [{ json: { postId: post.id, facebookPostId: String(id), pageName: post.facebook_pages.name } }];" },
+      "parameters": { "jsCode": "const post = $('Validate and Prepare').item.json;\nconst failure = $json.error?.message ?? $json.error ?? null;\nconst id = failure ? null : (post.isReel ? $('Start Reel Upload').item.json.video_id : ($json.id ?? $json.post_id));\nconst succeeded = Boolean(id);\nreturn [{ json: { postId: post.id, facebookPostId: id ? String(id) : null, pageName: post.facebook_pages.name, succeeded, errorMessage: succeeded ? null : String(failure ?? 'Meta did not return a publication id').slice(0, 1000), notification: (succeeded ? '✅ تم نشر المنشور على ' : '❌ فشل نشر المنشور على ') + post.facebook_pages.name } }];" },
       "id": "normalize-result",
       "name": "Normalize Publish Result",
       "type": "n8n-nodes-base.code",
@@ -154,11 +181,11 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ status: 'published', facebook_post_id: $json.facebookPostId, published_at: $now.toISO(), error_message: null }) }}",
+        "body": "={{ JSON.stringify($json.succeeded ? { status: 'published', facebook_post_id: $json.facebookPostId, published_at: $now.toISO(), error_message: null } : { status: 'failed', error_message: $json.errorMessage }) }}",
         "options": {}
       },
       "id": "save-success",
-      "name": "Mark Published",
+      "name": "Persist Publish Result",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1160, 20],
@@ -175,7 +202,9 @@
     "Upload Reel from Signed URL": { "main": [[{ "node": "Finish Reel Publish", "type": "main", "index": 0 }]] },
     "Finish Reel Publish": { "main": [[{ "node": "Normalize Publish Result", "type": "main", "index": 0 }]] },
     "Publish Text Photo or Video": { "main": [[{ "node": "Normalize Publish Result", "type": "main", "index": 0 }]] },
-    "Normalize Publish Result": { "main": [[{ "node": "Mark Published", "type": "main", "index": 0 }]] }
+    "Normalize Publish Result": { "main": [[{ "node": "Persist Publish Result", "type": "main", "index": 0 }]] },
+    "Persist Publish Result": { "main": [[{ "node": "Load Notification Chat", "type": "main", "index": 0 }]] },
+    "Load Notification Chat": { "main": [[{ "node": "Notify Publish Result", "type": "main", "index": 0 }]] }
   },
   "pinData": {},
   "settings": { "executionOrder": "v1", "saveManualExecutions": true, "callerPolicy": "workflowsFromSameOwner" },

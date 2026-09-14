@@ -16,8 +16,8 @@
 | Stage 9 — Local Agent | مكتملة | config، scoped RPC client، heartbeat، persistent Playwright وsafety stop |
 | Stage 10 — Friend Requests | مكتملة | limits، dual-state، timezone rollover، safe Playwright batch وsafety disable |
 | Stage 11 — Notifications | مكتملة | state-change notifications، daily summary وsanitized global errors |
-| Stage 12 — Hardening & QA | قيد التنفيذ | — |
-| Stage 13 — Documentation | لم تبدأ | — |
+| Stage 12 — Hardening & QA | مكتملة | failure persistence، security logging، graph validation، HMAC fixtures وCI PostgreSQL PASS |
+| Stage 13 — Documentation | قيد التنفيذ | — |
 | Stage 14 — Release | لم تبدأ | — |
 
 ## تدقيق Stage 0

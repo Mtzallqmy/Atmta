@@ -77,6 +77,26 @@
       "position": [0, 140]
     },
     {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_URL + '/rest/v1/automation_logs' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ source: 'telegram', action: 'unauthorized_access', level: 'security', message: 'Rejected unauthorized Telegram update', metadata: { telegram_user_id: $json.telegramUserId, chat_id: $json.chatId } }) }}",
+        "options": {}
+      },
+      "id": "log-denied",
+      "name": "Log Unauthorized Attempt",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [250, 140],
+      "continueOnFail": true,
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
       "parameters": { "resource": "callback", "operation": "answerQuery", "queryId": "={{ $json.callbackQueryId }}", "additionalFields": {} },
       "id": "ack-callback",
       "name": "Answer Callback Query",
@@ -103,7 +123,8 @@
     "Authorized?": { "main": [[{ "node": "Load Session", "type": "main", "index": 0 }], [{ "node": "Deny Unauthorized", "type": "main", "index": 0 }]] },
     "Load Session": { "main": [[{ "node": "Route Command or Callback", "type": "main", "index": 0 }]] },
     "Route Command or Callback": { "main": [[{ "node": "Answer Callback Query", "type": "main", "index": 0 }]] },
-    "Deny Unauthorized": { "main": [[{ "node": "Answer Callback Query", "type": "main", "index": 0 }]] },
+    "Deny Unauthorized": { "main": [[{ "node": "Log Unauthorized Attempt", "type": "main", "index": 0 }]] },
+    "Log Unauthorized Attempt": { "main": [[{ "node": "Answer Callback Query", "type": "main", "index": 0 }]] },
     "Answer Callback Query": { "main": [[{ "node": "Send Telegram Response", "type": "main", "index": 0 }]] }
   },
   "pinData": {},

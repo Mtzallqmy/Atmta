@@ -10,6 +10,7 @@
     "validate:workflows": "node scripts/validate-workflows.mjs",
     "check:env": "node scripts/check-env.mjs",
     "scan:secrets": "node scripts/secret-scan.mjs",
-    "validate": "pnpm typecheck && pnpm test && pnpm validate:workflows && pnpm check:env && pnpm scan:secrets"
+    "test:fixtures": "node scripts/test-fixtures.mjs",
+    "validate": "pnpm typecheck && pnpm test && pnpm test:fixtures && pnpm validate:workflows && pnpm check:env && pnpm scan:secrets"
   }
 }
