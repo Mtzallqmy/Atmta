@@ -17,8 +17,8 @@
 | Stage 10 — Friend Requests | مكتملة | limits، dual-state، timezone rollover، safe Playwright batch وsafety disable |
 | Stage 11 — Notifications | مكتملة | state-change notifications، daily summary وsanitized global errors |
 | Stage 12 — Hardening & QA | مكتملة | failure persistence، security logging، graph validation، HMAC fixtures وCI PostgreSQL PASS |
-| Stage 13 — Documentation | قيد التنفيذ | — |
-| Stage 14 — Release | لم تبدأ | — |
+| Stage 13 — Documentation | مكتملة | README، deployment، n8n/Supabase/Meta/Telegram/Agent، troubleshooting وchecklist |
+| Stage 14 — Release | قيد التنفيذ | يحتاج credentialed integration قبل tag مستقر |
 
 ## تدقيق Stage 0
 
