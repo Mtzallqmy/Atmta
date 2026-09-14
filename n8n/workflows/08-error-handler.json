@@ -1,0 +1,27 @@
+{
+  "name": "Atmta 08 - Global Error Handler",
+  "nodes": [
+    { "parameters": {}, "id": "error", "name": "Error Trigger", "type": "n8n-nodes-base.errorTrigger", "typeVersion": 1, "position": [-600, 0] },
+    {
+      "parameters": { "jsCode": "const workflow = $json.workflow?.name ?? 'Unknown workflow';\nconst executionId = String($json.execution?.id ?? 'unknown');\nconst raw = String($json.execution?.error?.message ?? $json.error?.message ?? 'Unknown error');\nconst message = raw.replace(/Bearer\\s+[A-Za-z0-9._~-]+/gi, 'Bearer [REDACTED]').replace(/\\b\\d{8,10}:[A-Za-z0-9_-]{30,}\\b/g, '[TELEGRAM_TOKEN_REDACTED]').slice(0, 1000);\nconst tokenHint = /token|oauth|permission/i.test(message) ? ' تحقق من Meta token والصلاحيات.' : '';\nreturn [{ json: { workflow, executionId, message, notification: `❌ فشل Workflow: ${workflow}\\nExecution: ${executionId}\\n${message}${tokenHint}` } }];" },
+      "id": "sanitize", "name": "Sanitize Error", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-380, 0]
+    },
+    {
+      "parameters": { "method": "POST", "url": "={{ $vars.SUPABASE_URL + '/rest/v1/automation_logs' }}", "authentication": "predefinedCredentialType", "nodeCredentialType": "supabaseApi", "sendBody": true, "contentType": "raw", "rawContentType": "application/json", "body": "={{ JSON.stringify({ source: 'n8n', action: 'workflow_failure', level: 'error', message: $json.message, metadata: { workflow: $json.workflow, execution_id: $json.executionId } }) }}", "options": {} },
+      "id": "log", "name": "Log Sanitized Error", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-140, 0], "continueOnFail": true,
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": { "url": "={{ $vars.SUPABASE_URL + '/rest/v1/telegram_admins?select=chat_id&enabled=eq.true&limit=1' }}", "authentication": "predefinedCredentialType", "nodeCredentialType": "supabaseApi", "options": { "response": { "response": { "responseFormat": "json" } } } },
+      "id": "admin", "name": "Load Admin", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [100, 0],
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": { "chatId": "={{ $json.chat_id }}", "text": "={{ $('Sanitize Error').item.json.notification }}", "additionalFields": { "appendAttribution": false } },
+      "id": "notify", "name": "Notify Admin", "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [340, 0],
+      "credentials": { "telegramApi": { "id": "REPLACE_TELEGRAM_CREDENTIAL_ID", "name": "Atmta Telegram Bot" } }
+    }
+  ],
+  "connections": { "Error Trigger": { "main": [[{ "node": "Sanitize Error", "type": "main", "index": 0 }]] }, "Sanitize Error": { "main": [[{ "node": "Log Sanitized Error", "type": "main", "index": 0 }]] }, "Log Sanitized Error": { "main": [[{ "node": "Load Admin", "type": "main", "index": 0 }]] }, "Load Admin": { "main": [[{ "node": "Notify Admin", "type": "main", "index": 0 }]] } },
+  "pinData": {}, "settings": { "executionOrder": "v1" }, "versionId": "88888888-8888-4888-8888-888888888888", "active": false, "tags": []
+}

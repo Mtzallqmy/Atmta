@@ -1,0 +1,49 @@
+{
+  "name": "Atmta 06 - Local Agent Notifications",
+  "nodes": [
+    { "parameters": { "rule": { "interval": [{ "field": "minutes", "minutesInterval": 2 }] } }, "id": "schedule", "name": "Every Two Minutes", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [-760, 0] },
+    {
+      "parameters": { "url": "={{ $vars.SUPABASE_URL + '/rest/v1/agent_status?select=agent_id,online,state,last_seen_at,current_task&order=last_seen_at.desc.nullslast&limit=1' }}", "authentication": "predefinedCredentialType", "nodeCredentialType": "supabaseApi", "options": { "response": { "response": { "responseFormat": "json" } } } },
+      "id": "status", "name": "Load Agent Status", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-540, 0], "alwaysOutputData": true,
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": { "jsCode": "const seen = $json.last_seen_at ? Date.parse($json.last_seen_at) : 0;\nconst online = Boolean($json.online) && Date.now() - seen < 120000;\nconst state = online ? ($json.state ?? 'idle') : 'offline';\nconst labels = { offline: '🔴 Local Agent غير متصل', safety_stopped: '⚠️ تم إيقاف Local Agent بسبب تحقق/تقييد أمني. افتح Facebook يدويًا، ولا تحاول تجاوز الحماية.', daily_limit_reached: '🎯 وصل Local Agent إلى الحد اليومي.', paused: '⏸ Local Agent متوقف مؤقتًا', running: '🟢 Local Agent يعمل', idle: '🟢 Local Agent متصل' };\nreturn [{ json: { stateKey: `${$json.agent_id ?? 'primary'}:${state}`, message: labels[state] ?? `حالة Local Agent: ${state}` } }];" },
+      "id": "derive", "name": "Derive State", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-320, 0]
+    },
+    {
+      "parameters": { "url": "={{ $vars.SUPABASE_URL + '/rest/v1/system_settings?select=value&key=eq.last_agent_notification&limit=1' }}", "authentication": "predefinedCredentialType", "nodeCredentialType": "supabaseApi", "options": { "response": { "response": { "responseFormat": "json" } } } },
+      "id": "previous", "name": "Load Previous Notification", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-100, 0], "alwaysOutputData": true,
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": { "conditions": { "conditions": [{ "leftValue": "={{ JSON.stringify($json.value ?? null) }}", "rightValue": "={{ JSON.stringify($('Derive State').item.json.stateKey) }}", "operator": { "type": "string", "operation": "notEquals" } }], "combinator": "and" } },
+      "id": "changed", "name": "State Changed?", "type": "n8n-nodes-base.if", "typeVersion": 2.2, "position": [120, 0]
+    },
+    {
+      "parameters": { "url": "={{ $vars.SUPABASE_URL + '/rest/v1/telegram_admins?select=chat_id&enabled=eq.true&limit=1' }}", "authentication": "predefinedCredentialType", "nodeCredentialType": "supabaseApi", "options": { "response": { "response": { "responseFormat": "json" } } } },
+      "id": "admin", "name": "Load Admin", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [340, -80],
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": { "chatId": "={{ $json.chat_id }}", "text": "={{ $('Derive State').item.json.message }}", "additionalFields": { "appendAttribution": false } },
+      "id": "notify", "name": "Send State Notification", "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [560, -80],
+      "credentials": { "telegramApi": { "id": "REPLACE_TELEGRAM_CREDENTIAL_ID", "name": "Atmta Telegram Bot" } }
+    },
+    {
+      "parameters": { "method": "POST", "url": "={{ $vars.SUPABASE_URL + '/rest/v1/system_settings?on_conflict=key' }}", "authentication": "predefinedCredentialType", "nodeCredentialType": "supabaseApi", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Prefer", "value": "resolution=merge-duplicates" }] }, "sendBody": true, "contentType": "raw", "rawContentType": "application/json", "body": "={{ JSON.stringify({ key: 'last_agent_notification', value: $('Derive State').item.json.stateKey }) }}", "options": {} },
+      "id": "remember", "name": "Remember Notification", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [780, -80],
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    }
+  ],
+  "connections": {
+    "Every Two Minutes": { "main": [[{ "node": "Load Agent Status", "type": "main", "index": 0 }]] },
+    "Load Agent Status": { "main": [[{ "node": "Derive State", "type": "main", "index": 0 }]] },
+    "Derive State": { "main": [[{ "node": "Load Previous Notification", "type": "main", "index": 0 }]] },
+    "Load Previous Notification": { "main": [[{ "node": "State Changed?", "type": "main", "index": 0 }]] },
+    "State Changed?": { "main": [[{ "node": "Load Admin", "type": "main", "index": 0 }], []] },
+    "Load Admin": { "main": [[{ "node": "Send State Notification", "type": "main", "index": 0 }]] },
+    "Send State Notification": { "main": [[{ "node": "Remember Notification", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {}, "settings": { "executionOrder": "v1", "timezone": "Asia/Aden" }, "versionId": "66666666-6666-4666-8666-666666666666", "active": false, "tags": []
+}

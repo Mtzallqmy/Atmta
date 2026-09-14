@@ -1,0 +1,23 @@
+{
+  "name": "Atmta 07 - Daily Summary",
+  "nodes": [
+    { "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 20 * * *" }] } }, "id": "schedule", "name": "Daily at 20:00", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [-560, 0] },
+    {
+      "parameters": { "method": "POST", "url": "={{ $vars.SUPABASE_URL + '/rest/v1/rpc/daily_summary' }}", "authentication": "predefinedCredentialType", "nodeCredentialType": "supabaseApi", "sendBody": true, "contentType": "raw", "rawContentType": "application/json", "body": "={{ JSON.stringify({ p_timezone: $vars.APP_TIMEZONE || 'Asia/Aden' }) }}", "options": { "response": { "response": { "responseFormat": "json" } } } },
+      "id": "summary", "name": "Load Daily Summary", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-320, 0],
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": { "url": "={{ $vars.SUPABASE_URL + '/rest/v1/telegram_admins?select=chat_id&enabled=eq.true&limit=1' }}", "authentication": "predefinedCredentialType", "nodeCredentialType": "supabaseApi", "options": { "response": { "response": { "responseFormat": "json" } } } },
+      "id": "admin", "name": "Load Admin", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-80, 0],
+      "credentials": { "supabaseApi": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "Atmta Supabase" } }
+    },
+    {
+      "parameters": { "chatId": "={{ $json.chat_id }}", "text": "={{ (() => { const s = $('Load Daily Summary').item.json; return `📊 التقرير اليومي — ${s.local_date}\\n\\n📢 المنشورات:\\nمنشور: ${s.posts.published}\\nمجدول: ${s.posts.scheduled}\\nفشل: ${s.posts.failed}\\n\\n💬 التعليقات:\\nجديد: ${s.comments.new}\\nتم الرد: ${s.comments.replied}\\n\\n👥 طلبات الصداقة: ${s.friends}\\n\\n🤖 Local Agent: ${s.agent.online ? 'Online' : 'Offline'} / ${s.agent.state}`; })() }}", "additionalFields": { "appendAttribution": false } },
+      "id": "send", "name": "Send Daily Summary", "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [160, 0],
+      "credentials": { "telegramApi": { "id": "REPLACE_TELEGRAM_CREDENTIAL_ID", "name": "Atmta Telegram Bot" } }
+    }
+  ],
+  "connections": { "Daily at 20:00": { "main": [[{ "node": "Load Daily Summary", "type": "main", "index": 0 }]] }, "Load Daily Summary": { "main": [[{ "node": "Load Admin", "type": "main", "index": 0 }]] }, "Load Admin": { "main": [[{ "node": "Send Daily Summary", "type": "main", "index": 0 }]] } },
+  "pinData": {}, "settings": { "executionOrder": "v1", "timezone": "Asia/Aden" }, "versionId": "77777777-7777-4777-8777-777777777777", "active": false, "tags": []
+}
