@@ -13,8 +13,8 @@
 | Stage 6 — Scheduling | مكتملة | Schedule Trigger، atomic SKIP LOCKED claim، cancel/reschedule RPCs |
 | Stage 7 — Meta Comments | مكتملة | GET challenge، raw-body HMAC SHA-256، normalization وdedupe |
 | Stage 8 — Comment Automation | مكتملة | atomic rule claim، cooldown/daily caps، auto reply وTelegram review |
-| Stage 9 — Local Agent | قيد التنفيذ | — |
-| Stage 10 — Friend Requests | لم تبدأ | — |
+| Stage 9 — Local Agent | مكتملة | config، scoped RPC client، heartbeat، persistent Playwright وsafety stop |
+| Stage 10 — Friend Requests | قيد التنفيذ | — |
 | Stage 11 — Notifications | لم تبدأ | — |
 | Stage 12 — Hardening & QA | لم تبدأ | — |
 | Stage 13 — Documentation | لم تبدأ | — |
